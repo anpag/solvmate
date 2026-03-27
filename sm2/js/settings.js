@@ -7,6 +7,7 @@ async function fetchSettings() {
         
         document.getElementById('telemetryProvider').value = currentConfig.telemetry.provider || 'local';
         document.getElementById('mlopsProvider').value = currentConfig.mlops.provider || 'local';
+        document.getElementById('endpointId').value = currentConfig.mlops.endpoint_id || '';
     } catch (error) {
         console.error("Error fetching config:", error);
     }
@@ -24,9 +25,11 @@ function hideSettingsModal() {
 async function saveSettings() {
     const telemetryProvider = document.getElementById('telemetryProvider').value;
     const mlopsProvider = document.getElementById('mlopsProvider').value;
+    const endpointId = document.getElementById('endpointId').value;
 
     currentConfig.telemetry.provider = telemetryProvider;
     currentConfig.mlops.provider = mlopsProvider;
+    currentConfig.mlops.endpoint_id = endpointId;
 
     try {
         const response = await fetch('/config', {

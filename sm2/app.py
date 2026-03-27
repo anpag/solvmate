@@ -130,6 +130,40 @@ async def plot_rank_by_solubility(request: Request, data: dict):
     plt.clf()
     return {"svg": buf.getvalue(),}
 
+# --- VERTEX AI SERVING ROUTES ---
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+@app.post("/predict")
+async def predict(data: dict):
+    instances = data.get("instances", [])
+    predictions = []
+    for inst in instances:
+        solute_smiles = inst["solute_smiles"]
+        solvents = inst["solvents"]
+        temps = inst["temps"]
+        facs = inst["facs"]
+        
+        dfo = run_predictions_for_solvents(
+            solute_smiles=solute_smiles,
+            solvents=solvents,
+            temps=temps,
+            facs=facs
+        )
+        
+        preds = []
+        for _, row in dfo.iterrows():
+            preds.append({
+                "solvent_smiles": str(row["solvent SMILES"]),
+                "temp": float(row["temp"]),
+                "log_s": float(row["log S"])
+            })
+        predictions.append(preds)
+        
+    return {"predictions": predictions}
+
+
 def _extend_dataframe_with_temp_range(df:pd.DataFrame,start,end,step,):
     df_ext = []
     temps = []
@@ -185,3 +219,37 @@ async def plot_t_curve(request: Request, data: dict):
     plt.savefig(buf,format="svg")
     plt.clf()
     return {"svg": buf.getvalue(),}
+
+# --- VERTEX AI SERVING ROUTES ---
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+@app.post("/predict")
+async def predict(data: dict):
+    instances = data.get("instances", [])
+    predictions = []
+    for inst in instances:
+        solute_smiles = inst["solute_smiles"]
+        solvents = inst["solvents"]
+        temps = inst["temps"]
+        facs = inst["facs"]
+        
+        dfo = run_predictions_for_solvents(
+            solute_smiles=solute_smiles,
+            solvents=solvents,
+            temps=temps,
+            facs=facs
+        )
+        
+        preds = []
+        for _, row in dfo.iterrows():
+            preds.append({
+                "solvent_smiles": str(row["solvent SMILES"]),
+                "temp": float(row["temp"]),
+                "log_s": float(row["log S"])
+            })
+        predictions.append(preds)
+        
+    return {"predictions": predictions}
+

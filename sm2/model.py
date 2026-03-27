@@ -509,6 +509,17 @@ def _least_squares_solution(g_solu:pd.DataFrame,id_col:str,include_abs_calcs=Tru
 
 
 def run_predictions_for_solvents(solute_smiles:str, solvents:list[str], temps:list[float]=None,facs:list[list[float]]=None,):
+    from sm2.config import load_config
+    cfg = load_config()
+    mlops_cfg = cfg.get("mlops", {})
+    if mlops_cfg.get("provider") == "vertex_endpoint":
+        from sm2.mlops.vertex_predictor import VertexEndpointPredictor
+        predictor = VertexEndpointPredictor(mlops_cfg.get("project_id"), mlops_cfg.get("endpoint_id"))
+        dfo, metadata = predictor.predict(solute_smiles, solvents, temps, facs)
+        global _LAST_MODEL_METADATA
+        _LAST_MODEL_METADATA = metadata
+        return dfo
+
     solvent_smiles_a = [solv_a for solv_a in solvents for solv_b in solvents ]
     solvent_smiles_b = [solv_b for solv_a in solvents for solv_b in solvents ]
 

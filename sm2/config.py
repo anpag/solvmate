@@ -13,7 +13,8 @@ DEFAULT_CONFIG = {
     "mlops": {
         "provider": "local", 
         "project_id": "gsk-lab-of-the-future",
-        "model_name": "solvmate-recommender"
+        "model_name": "solvmate-recommender",
+        "endpoint_id": ""
     }
 }
 

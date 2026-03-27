@@ -46,9 +46,14 @@
         <div style="margin-bottom: 15px;">
           <label><strong>MLOps Provider:</strong></label><br>
           <select id="mlopsProvider" style="width: 100%; padding: 5px;">
-            <option value="local">Local Checkpoints</option>
-            <option value="vertex">Vertex AI Model Registry</option>
+            <option value="local">Local Inference (Container)</option>
+            <option value="vertex_endpoint">Vertex AI Endpoint (Remote)</option>
           </select>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <label><strong>Vertex Endpoint ID:</strong></label><br>
+          <input type="text" id="endpointId" style="width: 100%; padding: 5px;" placeholder="e.g. 1234567890123456789">
         </div>
 
         <div class="buttongroup" style="text-align: right;">
