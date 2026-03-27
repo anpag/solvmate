@@ -1,8 +1,9 @@
 import base64
 import io
+import json
 from pathlib import Path
 import re
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import pandas as pd
@@ -13,6 +14,9 @@ from matplotlib import pyplot as plt
 from sm2.model import run_predictions_for_solvents
 from solvmate.ccryst.solvent import iupac_solvent_mixture_to_amounts, solvent_mixture_iupac_to_smiles
 
+from sm2.config import load_config, save_config
+from sm2.telemetry.local import LocalTracker
+from sm2.telemetry.pubsub import PubSubTracker
 
 app = FastAPI()
 
@@ -20,6 +24,28 @@ here = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=here / "js"), name="static")
 
 HTML = here / "js" / "app.html"
+
+# --- CONFIG & TRACKER INITIALIZATION ---
+def get_tracker():
+    cfg = load_config()
+    telemetry_cfg = cfg.get("telemetry", {})
+    if telemetry_cfg.get("provider") == "pubsub":
+        return PubSubTracker(telemetry_cfg.get("project_id"), telemetry_cfg.get("topic_name"))
+    return LocalTracker()
+
+tracker = get_tracker()
+
+@app.get("/config")
+async def get_config():
+    return load_config()
+
+@app.post("/config")
+async def post_config(new_config: dict):
+    save_config(new_config)
+    global tracker
+    tracker = get_tracker()
+    return {"status": "success", "config": new_config}
+# ---------------------------------------
 
 @app.get("/main/", response_class=HTMLResponse)
 async def main_page():
@@ -41,16 +67,12 @@ def _parse_in_order(funs, txt):
                 return rslt
     return None
 
-
 def _extract_temperatures(solvents:str,):
-    # Strip any temperature specifications, e.g. '250C, 298K' from 
-    # the solvent text. Translate it accordingly
     temps = []
     stripped_solvents = []
     for solv in solvents:
         parts = solv.split()
         stripped_parts = []
-        # 0 == 25 C == 298.15 K
         temp = 0
         for part in parts:
             mtch_C = re.match(r"([+-]?([0-9]*[.])?[0-9]+)C",part)
@@ -60,7 +82,6 @@ def _extract_temperatures(solvents:str,):
             elif mtch_K:
                 temp = float(mtch_K.group(1)) - 273.15
             else:
-                # it's not a temp spec so append
                 stripped_parts.append(part)
 
         temps.append(temp)
@@ -72,7 +93,7 @@ def _extract_temperatures(solvents:str,):
         
 
 @app.post("/plot-rank-by-solubility/")
-async def plot_rank_by_solubility(data:dict):
+async def plot_rank_by_solubility(request: Request, data: dict):
     solute_smiles = data["solute SMILES"]
     solvents = data["solvents"]
 
@@ -80,20 +101,26 @@ async def plot_rank_by_solubility(data:dict):
 
     solvent_amounts = [iupac_solvent_mixture_to_amounts(solv) for solv in solvents]
     solvent_smis = [_parse_in_order([solvent_mixture_iupac_to_smiles,_safe_from_smiles], solv) for solv in solvents]
-    # unpack the solvent amounts so that we get instead of a dictionary the
-    # solvent amount vector, instead.
     solvent_amounts =  [
         [samnt.get(s,1)/len(list(smix.split("."))) for s in smix.split(".")]
         for samnt,smix in zip(solvent_amounts,solvent_smis)
     ]
     solvent_smis = [smi for smi in solvent_smis if smi]
     solvent_smi_to_name = {smi:nme for smi,nme in zip(solvent_smis,solvents)}
+    
     dfo = run_predictions_for_solvents(solute_smiles=solute_smiles,solvents=solvent_smis,temps=temps,facs=solvent_amounts,)
     dfo = dfo.sort_values("log S",ascending=False,)
     dfo["solvents"] = dfo["solvent SMILES"].map(solvent_smi_to_name)
     dfo["temp"] = dfo["temp"].apply(float) + 25
     dfo["solvents_T"] = dfo["solvents"] + "__" + dfo["temp"].apply(str)
     
+    # --- DECOUPLED TELEMETRY ---
+    import sm2.model as sm2_model
+    metadata = getattr(sm2_model, '_LAST_MODEL_METADATA', {})
+    results = [{"solvent": str(row["solvents"]), "temp": float(row["temp"]), "log_s": float(row["log S"])} for _, row in dfo.iterrows()]
+    tracker.log_event(request, solute_smiles, data["solvents"], results, "solubility_ranking_requested", metadata)
+    # ---------------------------
+
     plt.clf()
     plt.figure(figsize=(10,2+len(dfo)//8))
     sns.barplot(data=dfo,x="log S",y="solvents_T")
@@ -113,25 +140,20 @@ def _extend_dataframe_with_temp_range(df:pd.DataFrame,start,end,step,):
     df_ext = pd.DataFrame(df_ext)
     df_ext["T"] = temps
     df_ext["temp"] = temps
-    #assert df_ext.columns == df.columns
     return df_ext
 
-
 @app.post("/plot-t-curve/")
-async def plot_rank_by_solubility(data:dict):
+async def plot_t_curve(request: Request, data: dict):
     solute_smiles = data["solute SMILES"]
     solvents = data["solvents"]
 
-    #temps,solvents = _extract_temperatures(solvents)
-    temp_start = -50 - 25 # convert from degrees
-    temp_end = +50 - 25 # convert from degrees
+    temp_start = -50 - 25 
+    temp_end = +50 - 25 
     temp_step = 10 
 
     solvent_amounts = [iupac_solvent_mixture_to_amounts(solv) for solv in solvents]
     solvent_smis = [_parse_in_order([solvent_mixture_iupac_to_smiles,_safe_from_smiles], solv) for solv in solvents]
 
-    # unpack the solvent amounts so that we get instead of a dictionary the
-    # solvent amount vector, instead.
     solvent_amounts =  [
         [samnt.get(s,1)/len(list(smix.split("."))) for s in smix.split(".")]
         for samnt,smix in zip(solvent_amounts,solvent_smis)
@@ -147,8 +169,14 @@ async def plot_rank_by_solubility(data:dict):
     dfo = run_predictions_for_solvents(solute_smiles=solute_smiles,solvents=solvent_smis,temps=temps,facs=solvent_amounts,)
     dfo["solvents"] = dfo["solvent SMILES"].map(solvent_smi_to_name)
     dfo["temp"] = dfo["temp"].apply(float) + 25
-    # dfo["solvents_T"] = dfo["solvents"] + "__" + dfo["temp"]
     
+    # --- DECOUPLED TELEMETRY ---
+    import sm2.model as sm2_model
+    metadata = getattr(sm2_model, '_LAST_MODEL_METADATA', {})
+    results = [{"solvent": str(row["solvents"]), "temp": float(row["temp"]), "log_s": float(row["log S"])} for _, row in dfo.iterrows()]
+    tracker.log_event(request, solute_smiles, data["solvents"], results, "temperature_curve_requested", metadata)
+    # ---------------------------
+
     plt.clf()
     plt.figure(figsize=(10,2+len(dfo)//8))
     sns.scatterplot(data=dfo,y="log S",x="temp",hue="solvents")

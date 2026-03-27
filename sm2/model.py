@@ -587,18 +587,35 @@ def run_predictions_for_smiles_pairs(solute_smiles:list[str], solvent_smiles_a:l
 
     pred_loader = DataLoader(dataset=data_pred, batch_size=batch_size, shuffle=False, collate_fn=collate_reaction_graphs)
 
+    from sm2.config import load_config
+    from sm2.mlops.local_loader import LocalLoader
+    from sm2.mlops.vertex_loader import VertexLoader
+    
+    cfg = load_config()
+    mlops_cfg = cfg.get("mlops", {})
+    if mlops_cfg.get("provider") == "vertex":
+        loader = VertexLoader(mlops_cfg.get("project_id"), mlops_cfg.get("model_name"))
+    else:
+        loader = LocalLoader()
+        
+    state_dict, metadata = loader.load_model(model_path, model_metadata_path)
+
     node_dim = data_pred.mol_dict_solu["node_attr"].shape[1]
     edge_dim = data_pred.mol_dict_solu["edge_attr"].shape[1]
     if torch.cuda.is_available():
         net = SMPredictor(node_dim, edge_dim).cuda()
-        net.load_state_dict(torch.load(model_path),)
+        net.load_state_dict(state_dict)
     else:
         net = SMPredictor(node_dim, edge_dim)
-        net.load_state_dict(torch.load(model_path,map_location=torch.device('cpu')))
+        net.load_state_dict(state_dict)
 
-    metadata = joblib.load(model_metadata_path,)
-    train_y_mean = metadata["train_y_mean"]
-    train_y_std = metadata["train_y_std"]
+    train_y_mean = metadata.get("train_y_mean", 0)
+    train_y_std = metadata.get("train_y_std", 1)
+    
+    # Store metadata globally or pass it up so the tracker can access it
+    global _LAST_MODEL_METADATA
+    _LAST_MODEL_METADATA = metadata
+
     return inference(net,pred_loader, train_y_mean, train_y_std)
 
 

@@ -53,7 +53,9 @@ RUN /bin/bash -c "source activate myenv && \
     pip install xmltodict && \
     pip install scikit-learn && \
     pip install xtbf && \
-    pip install rdkit"
+    pip install rdkit && \
+    pip install google-cloud-pubsub && \
+    pip install google-cloud-aiplatform"
 
 COPY . /solvmate
 
@@ -67,4 +69,6 @@ ENV PYTHONPATH="/solvmate/:${PYTHONPATH}"
 # source activate myenv
 # ENTRYPOINT [ "python", "/solvmate/src/solvmate/app/app.py" ]
 # ENTRYPOINT "source activate myenv && fastapi dev --port 8890 --host 0.0.0.0 /solvmate/sm2/app.py"
+ENTRYPOINT ["bash", "/solvmate/run_app_docker.sh"]
+stapi dev --port 8890 --host 0.0.0.0 /solvmate/sm2/app.py"
 ENTRYPOINT ["bash", "/solvmate/run_app_docker.sh"]
