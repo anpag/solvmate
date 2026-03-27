@@ -21,8 +21,7 @@
     <div style="display:inline-block;"> | </div>
     <button style=" display:inline-block;" class="primary" onclick="runRanking()">rank</button>
     <button style=" display:inline-block;" class="primary" onclick="runTCurve()">T curve</button>
-    <div style="display:inline-block; margin-left: 20px;"></div>
-    <button style=" display:inline-block;" class="secondary" onclick="showSettingsModal()">⚙️ Settings</button>
+    <button style=" display:inline-block; margin-left: 20px;" class="secondary" onclick="showSettingsModal()">⚙️ Settings</button>
   </header>
   <main>
     <div style="display:inline-block;" id="status-message"></div>
@@ -30,33 +29,32 @@
     </div>
     
     <!-- Settings Modal -->
-    <div class="modal" id="settingsModal" style="display: none;">
-      <div style="background-color: white; padding: 20px; border-radius: 8px; width: 400px; margin: 100px auto; border: 1px solid #ccc;">
-        <h3>Configuration Settings</h3>
-        <p class="infoText">Configure Telemetry and MLOps Providers.</p>
+    <div class="modal" id="settingsModal" style="display: none; height: auto; min-height: 400px;">
+      <div style="padding: 20px;">
+        <h3 style="margin-bottom: 20px; text-align: left;">Configuration Settings</h3>
         
-        <div style="margin-bottom: 15px;">
-          <label><strong>Telemetry Provider:</strong></label><br>
-          <select id="telemetryProvider" style="width: 100%; padding: 5px;">
+        <div style="margin-bottom: 20px; text-align: left;">
+          <label style="display: block; margin-bottom: 8px;"><strong>Telemetry Provider:</strong></label>
+          <select id="telemetryProvider" style="width: 100%; padding: 8px; font-size: 14px;">
             <option value="local">Local (stdout)</option>
             <option value="pubsub">Google Cloud Pub/Sub</option>
           </select>
         </div>
 
-        <div style="margin-bottom: 15px;">
-          <label><strong>MLOps Provider:</strong></label><br>
-          <select id="mlopsProvider" style="width: 100%; padding: 5px;">
+        <div style="margin-bottom: 20px; text-align: left;">
+          <label style="display: block; margin-bottom: 8px;"><strong>MLOps Provider:</strong></label>
+          <select id="mlopsProvider" style="width: 100%; padding: 8px; font-size: 14px;">
             <option value="local">Local Inference (Container)</option>
             <option value="vertex_endpoint">Vertex AI Endpoint (Remote)</option>
           </select>
         </div>
 
-        <div style="margin-bottom: 15px;">
-          <label><strong>Vertex Endpoint ID:</strong></label><br>
-          <input type="text" id="endpointId" style="width: 100%; padding: 5px;" placeholder="e.g. 1234567890123456789">
+        <div style="margin-bottom: 30px; text-align: left;">
+          <label style="display: block; margin-bottom: 8px;"><strong>Vertex Endpoint ID:</strong></label>
+          <input type="text" id="endpointId" style="width: 100%; padding: 8px; font-size: 14px; box-sizing: border-box;" placeholder="e.g. 1234567890123456789">
         </div>
 
-        <div class="buttongroup" style="text-align: right;">
+        <div class="buttongroup">
           <button onclick="saveSettings();" class="primary">Save</button>
           <button onclick="hideSettingsModal();" class="secondary">Cancel</button>
         </div>
